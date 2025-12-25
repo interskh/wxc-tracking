@@ -32,9 +32,9 @@ export const RATE_LIMIT_MS = 3000;
 
 // Job processing configuration
 export const JOB_CONFIG = {
-  // Batch sizes (tuned for 10s hobby timeout)
-  archiveBatchSize: 2, // Archive URLs per batch invocation
-  subpageBatchSize: 2, // Subpage URLs per batch invocation
+  // Batch sizes (larger to reduce chain calls and avoid 508 loop detection)
+  archiveBatchSize: 3, // Archive URLs per batch invocation
+  subpageBatchSize: 5, // Subpage URLs per batch invocation
 
   // Timing
   rateLimitMs: RATE_LIMIT_MS, // Between requests within a batch
