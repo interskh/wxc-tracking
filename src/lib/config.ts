@@ -50,8 +50,9 @@ export const JOB_CONFIG = {
 // Email configuration
 // NOTIFICATION_EMAIL can be comma-separated for multiple recipients
 // e.g., "user1@example.com,user2@example.com"
+// EMAIL_FROM: Use your verified domain, or "onboarding@resend.dev" for testing
 export const EMAIL_CONFIG = {
-  from: "Webpage Tracker <tracker@yourdomain.com>",
+  from: process.env.EMAIL_FROM || "Webpage Tracker <onboarding@resend.dev>",
   to: (process.env.NOTIFICATION_EMAIL || "")
     .split(",")
     .map((e) => e.trim())
