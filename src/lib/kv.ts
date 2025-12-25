@@ -1,12 +1,13 @@
-import { kv as vercelKv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
 
-// In-memory store for local development without Vercel KV
+// In-memory store for local development without Upstash
 const memoryStore = new Map<string, unknown>();
 const memoryLists = new Map<string, string[]>();
 const memorySets = new Map<string, Set<string>>();
 
 const isLocalDev =
-  process.env.NODE_ENV === "development" && !process.env.KV_REST_API_URL;
+  process.env.NODE_ENV === "development" &&
+  !process.env.UPSTASH_REDIS_REST_URL;
 
 // KV interface matching what we use
 interface KVStore {
@@ -40,7 +41,6 @@ const localKv: KVStore = {
     _options?: { ex?: number }
   ): Promise<"OK"> {
     memoryStore.set(key, value);
-    // Note: TTL (options.ex) is ignored in local dev - memory clears on restart anyway
     return "OK";
   },
 
@@ -155,9 +155,94 @@ const localKv: KVStore = {
   },
 };
 
+// Create Upstash Redis client (only when not in local dev)
+const upstashRedis = isLocalDev
+  ? null
+  : Redis.fromEnv();
+
+// Wrapper to match our KVStore interface
+const upstashKv: KVStore = {
+  async get<T>(key: string): Promise<T | null> {
+    return upstashRedis!.get<T>(key);
+  },
+
+  async set(
+    key: string,
+    value: unknown,
+    options?: { ex?: number }
+  ): Promise<"OK"> {
+    if (options?.ex) {
+      await upstashRedis!.set(key, value, { ex: options.ex });
+    } else {
+      await upstashRedis!.set(key, value);
+    }
+    return "OK";
+  },
+
+  async del(...keys: string[]): Promise<number> {
+    return upstashRedis!.del(...keys);
+  },
+
+  async hgetall<T>(key: string): Promise<T | null> {
+    const result = await upstashRedis!.hgetall(key);
+    if (!result || Object.keys(result).length === 0) return null;
+    return result as T;
+  },
+
+  async hget<T>(key: string, field: string): Promise<T | null> {
+    return upstashRedis!.hget<T>(key, field);
+  },
+
+  async hset(key: string, value: Record<string, unknown>): Promise<number> {
+    return upstashRedis!.hset(key, value);
+  },
+
+  async lpush(key: string, ...values: string[]): Promise<number> {
+    return upstashRedis!.lpush(key, ...values);
+  },
+
+  async rpush(key: string, ...values: string[]): Promise<number> {
+    return upstashRedis!.rpush(key, ...values);
+  },
+
+  async lpop<T>(key: string, count?: number): Promise<T | null> {
+    if (count) {
+      return upstashRedis!.lpop<T>(key, count);
+    }
+    return upstashRedis!.lpop<T>(key);
+  },
+
+  async llen(key: string): Promise<number> {
+    return upstashRedis!.llen(key);
+  },
+
+  async lrange(key: string, start: number, stop: number): Promise<string[]> {
+    return upstashRedis!.lrange(key, start, stop);
+  },
+
+  async sadd(key: string, ...members: string[]): Promise<number> {
+    return upstashRedis!.sadd(key, ...members as [string, ...string[]]);
+  },
+
+  async sismember(key: string, member: string): Promise<number> {
+    return upstashRedis!.sismember(key, member);
+  },
+
+  async smembers(key: string): Promise<string[]> {
+    return upstashRedis!.smembers(key);
+  },
+
+  async scard(key: string): Promise<number> {
+    return upstashRedis!.scard(key);
+  },
+
+  async keys(pattern: string): Promise<string[]> {
+    return upstashRedis!.keys(pattern);
+  },
+};
+
 // Export the appropriate KV implementation
-// Cast to our interface to avoid union type issues
-export const kv: KVStore = isLocalDev ? localKv : (vercelKv as unknown as KVStore);
+export const kv: KVStore = isLocalDev ? localKv : upstashKv;
 
 // Helper to check if using local dev mode
 export const isUsingLocalKv = isLocalDev;

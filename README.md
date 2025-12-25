@@ -58,10 +58,12 @@ npm i -g vercel
 vercel
 ```
 
-### 2. Configure Vercel KV
+### 2. Add Upstash Redis
 
-1. Go to Vercel dashboard → **Storage** → **Create Database** → **KV**
-2. Connect to your project (auto-sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`)
+1. Go to [Vercel Marketplace](https://vercel.com/marketplace/upstash) → **Upstash**
+2. Click **Add Integration** → select your project
+3. Create a new Redis database (or use existing)
+4. Environment variables (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) are auto-added
 
 ### 3. Configure Resend
 
@@ -75,8 +77,8 @@ Set in Vercel dashboard → Settings → Environment Variables:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `KV_REST_API_URL` | Yes | Auto-set by Vercel KV |
-| `KV_REST_API_TOKEN` | Yes | Auto-set by Vercel KV |
+| `UPSTASH_REDIS_REST_URL` | Yes | Auto-set by Upstash integration |
+| `UPSTASH_REDIS_REST_TOKEN` | Yes | Auto-set by Upstash integration |
 | `RESEND_API_KEY` | Yes | Resend API key |
 | `NOTIFICATION_EMAIL` | Yes | Email to receive digests |
 | `CRON_SECRET` | Yes | Secret for cron endpoint |
