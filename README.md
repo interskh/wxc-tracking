@@ -132,6 +132,40 @@ curl "http://localhost:3021/api/reset?full=true"  # Full reset including seen po
 
 Local dev uses an in-memory KV mock and direct fetch for chaining, so no Upstash credentials needed locally.
 
+## Production Usage
+
+Replace `YOUR_DOMAIN` with your Vercel deployment URL (e.g., `wxc-tracking.vercel.app`) and `YOUR_CRON_SECRET` with your `CRON_SECRET` environment variable value.
+
+### Trigger a job manually
+```bash
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" \
+  https://YOUR_DOMAIN/api/cron
+```
+
+### Force start a new job (even if one is running)
+```bash
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" \
+  "https://YOUR_DOMAIN/api/cron?force=true"
+```
+
+### Check job status (no auth required)
+```bash
+curl https://YOUR_DOMAIN/api/job/status
+```
+
+### Preview digest HTML (no auth required)
+```bash
+curl https://YOUR_DOMAIN/api/preview
+```
+
+### Reset job state (no auth required)
+```bash
+curl https://YOUR_DOMAIN/api/reset
+
+# Full reset including seen posts history
+curl "https://YOUR_DOMAIN/api/reset?full=true"
+```
+
 ## Configuration
 
 Key settings in `src/lib/config.ts`:
