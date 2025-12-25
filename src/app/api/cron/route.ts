@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createJob, getCurrentJob, checkStuckJob, transitionJob } from "@/lib/job";
-import { chainNext, CHAIN_ENDPOINTS } from "@/lib/chain";
+import { publishNext, CHAIN_ENDPOINTS } from "@/lib/qstash";
 
 // Verify cron secret for security
 function verifyCronSecret(request: Request): boolean {
@@ -54,10 +54,10 @@ export async function GET(request: Request) {
     const job = await createJob();
     console.log("[CRON] Created job:", job.id);
 
-    // Chain to first archive batch
-    console.log("[CRON] Chaining to archive...");
-    await chainNext(CHAIN_ENDPOINTS.archive, { jobId: job.id, batchIndex: 0 });
-    console.log("[CRON] Chain complete");
+    // Chain to first archive batch via QStash
+    console.log("[CRON] Publishing to QStash for archive processing...");
+    await publishNext(CHAIN_ENDPOINTS.archive, { jobId: job.id, batchIndex: 0 });
+    console.log("[CRON] QStash publish complete");
 
     return NextResponse.json({
       success: true,

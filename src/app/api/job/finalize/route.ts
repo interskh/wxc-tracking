@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { verifyChainOrCron } from "@/lib/chain";
-import { getJob, getAllPosts, transitionJob, cleanupJob } from "@/lib/job";
+import { verifyAndParseBody } from "@/lib/qstash";
+import { getJob, getAllPosts, transitionJob } from "@/lib/job";
 import { markPostsAsSeen, updateLastCheck } from "@/lib/storage";
 import { sendDigestWithContent } from "@/lib/email";
 import { FinalizeRequest, JobPost } from "@/types/job";
@@ -8,14 +8,14 @@ import { FinalizeRequest, JobPost } from "@/types/job";
 export async function POST(request: Request) {
   console.log("[FINALIZE] Received request");
 
-  // Verify internal chain
-  if (!verifyChainOrCron(request)) {
+  // Verify QStash signature and parse body
+  const { verified, body } = await verifyAndParseBody<FinalizeRequest>(request);
+  if (!verified) {
     console.log("[FINALIZE] Unauthorized");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await request.json()) as FinalizeRequest;
-  const { jobId } = body;
+  const { jobId } = body!;
   console.log(`[FINALIZE] Processing job ${jobId}`);
 
   try {

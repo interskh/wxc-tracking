@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyChainOrCron, chainNext, CHAIN_ENDPOINTS } from "@/lib/chain";
+import { verifyAndParseBody, publishNext, CHAIN_ENDPOINTS } from "@/lib/qstash";
 import {
   getJob,
   getSubpageBatch,
@@ -16,14 +16,14 @@ import { SubpageBatchRequest } from "@/types/job";
 export async function POST(request: Request) {
   console.log("[SUBPAGE] Received request");
 
-  // Verify internal chain
-  if (!verifyChainOrCron(request)) {
+  // Verify QStash signature and parse body
+  const { verified, body } = await verifyAndParseBody<SubpageBatchRequest>(request);
+  if (!verified) {
     console.log("[SUBPAGE] Unauthorized");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await request.json()) as SubpageBatchRequest;
-  const { jobId, batchIndex } = body;
+  const { jobId, batchIndex } = body!;
   console.log(`[SUBPAGE] Processing batch ${batchIndex} for job ${jobId}`);
 
   try {
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       const queueEmpty = await isSubpageQueueEmpty(jobId);
       if (queueEmpty) {
         await transitionJob(jobId, "finalizing");
-        await chainNext(CHAIN_ENDPOINTS.finalize, { jobId });
+        await publishNext(CHAIN_ENDPOINTS.finalize, { jobId });
       }
       return NextResponse.json({ success: true, message: "Queue empty" });
     }
@@ -101,9 +101,9 @@ export async function POST(request: Request) {
     const queueEmpty = await isSubpageQueueEmpty(jobId);
     if (queueEmpty) {
       await transitionJob(jobId, "finalizing");
-      await chainNext(CHAIN_ENDPOINTS.finalize, { jobId });
+      await publishNext(CHAIN_ENDPOINTS.finalize, { jobId });
     } else {
-      await chainNext(CHAIN_ENDPOINTS.subpage, { jobId, batchIndex: batchIndex + 1 });
+      await publishNext(CHAIN_ENDPOINTS.subpage, { jobId, batchIndex: batchIndex + 1 });
     }
 
     return NextResponse.json({

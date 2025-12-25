@@ -1,6 +1,6 @@
 # Webpage Tracker
 
-A serverless web tracker that monitors wenxuecity forum posts and sends daily email digests with full post content. Built for Vercel with multi-phase job chaining to work within serverless timeout limits.
+A serverless web tracker that monitors wenxuecity forum posts and sends daily email digests with full post content. Built for Vercel with Upstash QStash for reliable job chaining within serverless timeout limits.
 
 ## Features
 
@@ -9,32 +9,33 @@ A serverless web tracker that monitors wenxuecity forum posts and sends daily em
 - Filters to posts from last 7 days only
 - Deduplicates posts across runs
 - Sends aggregated email digests via Resend
-- Multi-phase job architecture for serverless compatibility
+- Multi-phase job architecture with QStash for serverless compatibility
 - Preview endpoint to see results before email
+- Supports multiple email recipients
 
 ## Architecture
 
 ```
-VERCEL CRON (daily)
+VERCEL CRON (6am PST / 14:00 UTC daily)
         |
         v
 +------------------+
 | /api/cron        |  <- Initialize job, queue archives
 +------------------+
         |
-        v (chain via fetch)
+        v (via QStash)
 +------------------+
 | /api/job/archive |  <- Batch scrape archive pages
 | (multiple calls) |     Parse posts, queue subpages
 +------------------+
         |
-        v
+        v (via QStash)
 +------------------+
 | /api/job/subpage |  <- Fetch full post content
 | (multiple calls) |     Rate-limited requests
 +------------------+
         |
-        v
+        v (via QStash)
 +------------------+
 | /api/job/finalize|  <- Send email, mark posts seen
 +------------------+
@@ -47,7 +48,7 @@ VERCEL CRON (daily)
 | `/api/cron` | GET | Trigger job (add `?force=true` to force new) |
 | `/api/preview` | GET | Preview digest HTML |
 | `/api/job/status` | GET | Check job status |
-| `/api/reset` | GET | Clear all job state |
+| `/api/reset` | GET | Clear job state (add `?full=true` to also clear seen posts) |
 
 ## Setup
 
@@ -60,36 +61,49 @@ vercel
 
 ### 2. Add Upstash Redis
 
-1. Go to [Vercel Marketplace](https://vercel.com/marketplace/upstash) → **Upstash**
-2. Click **Add Integration** → select your project
-3. Create a new Redis database (or use existing)
-4. Environment variables (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) are auto-added
+1. Go to [Upstash Console](https://console.upstash.com) → Create Database
+2. Copy the REST URL and token
+3. Add to Vercel environment variables:
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
 
-### 3. Configure Resend
+### 3. Add Upstash QStash
+
+1. Go to [Upstash Console](https://console.upstash.com) → QStash
+2. Copy the token and signing keys
+3. Add to Vercel environment variables:
+   - `QSTASH_TOKEN`
+   - `QSTASH_CURRENT_SIGNING_KEY`
+   - `QSTASH_NEXT_SIGNING_KEY`
+
+### 4. Configure Resend
 
 1. Create account at [resend.com](https://resend.com)
 2. Get API key and verify your domain
 3. Set `RESEND_API_KEY` in Vercel
 
-### 4. Environment Variables
+### 5. Environment Variables
 
 Set in Vercel dashboard → Settings → Environment Variables:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `UPSTASH_REDIS_REST_URL` | Yes | Auto-set by Upstash integration |
-| `UPSTASH_REDIS_REST_TOKEN` | Yes | Auto-set by Upstash integration |
+| `UPSTASH_REDIS_REST_URL` | Yes | Upstash Redis REST URL |
+| `UPSTASH_REDIS_REST_TOKEN` | Yes | Upstash Redis REST token |
+| `QSTASH_TOKEN` | Yes | QStash token for job publishing |
+| `QSTASH_CURRENT_SIGNING_KEY` | Yes | QStash signature verification |
+| `QSTASH_NEXT_SIGNING_KEY` | Yes | QStash signature verification (rotation) |
 | `RESEND_API_KEY` | Yes | Resend API key |
-| `NOTIFICATION_EMAIL` | Yes | Email to receive digests |
+| `NOTIFICATION_EMAIL` | Yes | Email(s) to receive digests (comma-separated) |
+| `EMAIL_SUBJECT` | No | Custom email subject (default: 文学城论坛更新) |
 | `CRON_SECRET` | Yes | Secret for cron endpoint |
-| `CHAIN_SECRET` | Yes | Secret for internal job chaining |
 
 Generate secrets:
 ```bash
 openssl rand -hex 32
 ```
 
-### 5. Configure Keywords
+### 6. Configure Keywords
 
 Edit `src/lib/config.ts`:
 
@@ -112,9 +126,11 @@ Test endpoints:
 curl http://localhost:3021/api/cron
 curl http://localhost:3021/api/preview
 curl http://localhost:3021/api/job/status
+curl http://localhost:3021/api/reset
+curl "http://localhost:3021/api/reset?full=true"  # Full reset including seen posts
 ```
 
-Local dev uses an in-memory KV mock, so no Vercel KV credentials needed.
+Local dev uses an in-memory KV mock and direct fetch for chaining, so no Upstash credentials needed locally.
 
 ## Configuration
 
@@ -122,36 +138,47 @@ Key settings in `src/lib/config.ts`:
 
 ```typescript
 export const JOB_CONFIG = {
-  archiveBatchSize: 2,    // Archive URLs per batch
-  subpageBatchSize: 2,    // Subpages per batch
-  rateLimitMs: 3000,      // Delay between requests
+  archiveBatchSize: 3,    // Archive URLs per batch
+  subpageBatchSize: 5,    // Subpages per batch
+  rateLimitMs: 3000,      // Delay between requests (3s)
   maxAgeDays: 7,          // Only include recent posts
-  minBytesForContent: 1,  // Minimum bytes to fetch content
+  minBytesForContent: 1,  // Minimum bytes to fetch content (0 = skip empty)
+};
+
+export const EMAIL_CONFIG = {
+  from: "Webpage Tracker <tracker@yourdomain.com>",
+  to: ["user1@example.com", "user2@example.com"],  // From NOTIFICATION_EMAIL
+  subject: "文学城论坛更新",  // From EMAIL_SUBJECT
 };
 ```
 
 ## Cron Schedule
 
-Runs daily at 8:00 AM UTC. Modify in `vercel.json`:
+Runs daily at 6:00 AM PST (14:00 UTC). Modify in `vercel.json`:
 
 ```json
 {
   "crons": [{
     "path": "/api/cron",
-    "schedule": "0 8 * * *"
+    "schedule": "0 14 * * *"
   }]
 }
 ```
 
-## Vercel Hobby Plan Limits
-
-- 2 cron jobs per account
-- 10 second function timeout (handled via job chaining)
-- Daily cron execution
-
 ## Cost
 
 Runs on free tiers:
-- Vercel Hobby: Free
-- Vercel KV: 3,000 requests/month free
-- Resend: 100 emails/month free
+- **Vercel Hobby**: Free (Pro recommended for 60s timeout)
+- **Upstash Redis**: 10,000 commands/day free
+- **Upstash QStash**: 1,000 messages/day free
+- **Resend**: 100 emails/month free
+
+## Why QStash?
+
+Previous versions used self-triggering `fetch()` calls for job chaining, which caused Vercel's 508 "Loop Detected" error. QStash provides:
+
+- Reliable message delivery with automatic retries
+- Signature verification for security
+- No loop detection issues
+- Built-in delay and scheduling
+- Same Upstash account as Redis

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyChainOrCron, chainNext, CHAIN_ENDPOINTS } from "@/lib/chain";
+import { verifyAndParseBody, publishNext, CHAIN_ENDPOINTS } from "@/lib/qstash";
 import {
   getJob,
   getArchiveBatch,
@@ -30,14 +30,14 @@ function filterRecentPosts(posts: ForumPost[], maxDays: number): ForumPost[] {
 export async function POST(request: Request) {
   console.log("[ARCHIVE] Received request");
 
-  // Verify internal chain
-  if (!verifyChainOrCron(request)) {
+  // Verify QStash signature and parse body
+  const { verified, body } = await verifyAndParseBody<ArchiveBatchRequest>(request);
+  if (!verified) {
     console.log("[ARCHIVE] Unauthorized");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await request.json()) as ArchiveBatchRequest;
-  const { jobId, batchIndex } = body;
+  const { jobId, batchIndex } = body!;
   console.log(`[ARCHIVE] Processing batch ${batchIndex} for job ${jobId}`);
 
   try {
@@ -64,11 +64,11 @@ export async function POST(request: Request) {
         // Check if we have subpages to fetch
         if (job.subpagesTotal > 0) {
           await transitionJob(jobId, "fetching");
-          await chainNext(CHAIN_ENDPOINTS.subpage, { jobId, batchIndex: 0 });
+          await publishNext(CHAIN_ENDPOINTS.subpage, { jobId, batchIndex: 0 });
         } else {
           // No subpages, go straight to finalize
           await transitionJob(jobId, "finalizing");
-          await chainNext(CHAIN_ENDPOINTS.finalize, { jobId });
+          await publishNext(CHAIN_ENDPOINTS.finalize, { jobId });
         }
       }
       return NextResponse.json({ success: true, message: "Queue empty" });
@@ -152,15 +152,15 @@ export async function POST(request: Request) {
       const updatedJob = await getJob(jobId);
       if (updatedJob && updatedJob.subpagesTotal > 0) {
         await transitionJob(jobId, "fetching");
-        await chainNext(CHAIN_ENDPOINTS.subpage, { jobId, batchIndex: 0 });
+        await publishNext(CHAIN_ENDPOINTS.subpage, { jobId, batchIndex: 0 });
       } else {
         // No subpages, go to finalize
         await transitionJob(jobId, "finalizing");
-        await chainNext(CHAIN_ENDPOINTS.finalize, { jobId });
+        await publishNext(CHAIN_ENDPOINTS.finalize, { jobId });
       }
     } else {
       // More archives to process
-      await chainNext(CHAIN_ENDPOINTS.archive, { jobId, batchIndex: batchIndex + 1 });
+      await publishNext(CHAIN_ENDPOINTS.archive, { jobId, batchIndex: batchIndex + 1 });
     }
 
     return NextResponse.json({
