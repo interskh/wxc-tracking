@@ -23,7 +23,7 @@ export async function sendNewItemsEmail(
     return { success: false, error: "RESEND_API_KEY not configured" };
   }
 
-  if (!EMAIL_CONFIG.to) {
+  if (EMAIL_CONFIG.to.length === 0) {
     console.log("NOTIFICATION_EMAIL not configured, skipping email");
     return { success: false, error: "NOTIFICATION_EMAIL not configured" };
   }
@@ -74,7 +74,7 @@ export async function sendNewItemsEmail(
 export async function sendAggregatedEmail(
   postsByKeyword: Map<string, ForumPost[]>
 ): Promise<EmailResult> {
-  if (!process.env.RESEND_API_KEY || !EMAIL_CONFIG.to) {
+  if (!process.env.RESEND_API_KEY || EMAIL_CONFIG.to.length === 0) {
     return { success: false, error: "Email not configured" };
   }
 
@@ -142,7 +142,7 @@ export async function sendAggregatedEmail(
 export async function sendDigestWithContent(
   postsByKeyword: Map<string, JobPost[]>
 ): Promise<EmailResult> {
-  if (!process.env.RESEND_API_KEY || !EMAIL_CONFIG.to) {
+  if (!process.env.RESEND_API_KEY || EMAIL_CONFIG.to.length === 0) {
     console.log("Email not configured, skipping");
     return { success: false, error: "Email not configured" };
   }
@@ -210,7 +210,7 @@ export async function sendDigestWithContent(
     const { error } = await resend.emails.send({
       from: EMAIL_CONFIG.from,
       to: EMAIL_CONFIG.to,
-      subject: `Daily Digest: ${totalPosts} New Posts`,
+      subject: `${EMAIL_CONFIG.subject} (${totalPosts}篇)`,
       html,
     });
 

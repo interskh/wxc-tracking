@@ -48,10 +48,15 @@ export const JOB_CONFIG = {
 };
 
 // Email configuration
+// NOTIFICATION_EMAIL can be comma-separated for multiple recipients
+// e.g., "user1@example.com,user2@example.com"
 export const EMAIL_CONFIG = {
   from: "Webpage Tracker <tracker@yourdomain.com>",
-  to: process.env.NOTIFICATION_EMAIL || "",
-  subject: "New Items Found - Webpage Tracker",
+  to: (process.env.NOTIFICATION_EMAIL || "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter((e) => e.length > 0),
+  subject: process.env.EMAIL_SUBJECT || "文学城论坛更新",
 };
 
 // Helper to get tracking URLs (for backward compatibility)
