@@ -110,6 +110,15 @@ export async function transitionJob(
   }
 }
 
+// Safely parse JSON - handles both string and already-parsed objects
+// (Upstash auto-deserializes, local mock doesn't)
+function safeParse<T>(item: unknown): T {
+  if (typeof item === "string") {
+    return JSON.parse(item);
+  }
+  return item as T;
+}
+
 // Get next batch of archive URLs
 export async function getArchiveBatch(
   jobId: string
@@ -117,9 +126,9 @@ export async function getArchiveBatch(
   const batch: { name: string; url: string }[] = [];
 
   for (let i = 0; i < JOB_CONFIG.archiveBatchSize; i++) {
-    const item = await kv.lpop<string>(keys.archiveQueue(jobId));
+    const item = await kv.lpop<{ name: string; url: string }>(keys.archiveQueue(jobId));
     if (!item) break;
-    batch.push(JSON.parse(item));
+    batch.push(safeParse(item));
   }
 
   return batch;
@@ -184,9 +193,9 @@ export async function getPost(
   jobId: string,
   postId: string
 ): Promise<JobPost | null> {
-  const data = await kv.hget<string>(keys.posts(jobId), postId);
+  const data = await kv.hget<JobPost>(keys.posts(jobId), postId);
   if (!data) return null;
-  return JSON.parse(data);
+  return safeParse<JobPost>(data);
 }
 
 // Update a post
@@ -204,10 +213,10 @@ export async function updatePost(
 
 // Get all posts for a job
 export async function getAllPosts(jobId: string): Promise<JobPost[]> {
-  const data = await kv.hgetall<Record<string, string>>(keys.posts(jobId));
+  const data = await kv.hgetall<Record<string, JobPost>>(keys.posts(jobId));
   if (!data) return [];
 
-  return Object.values(data).map((v) => JSON.parse(v));
+  return Object.values(data).map((v) => safeParse<JobPost>(v));
 }
 
 // Cleanup job data
