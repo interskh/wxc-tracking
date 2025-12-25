@@ -2,12 +2,23 @@
 // No external dependencies - uses fire-and-forget pattern
 
 function getBaseUrl(): string {
-  // Vercel provides VERCEL_URL in production
+  // Check for explicit base URL first
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    return process.env.NEXT_PUBLIC_BASE_URL;
+  }
+
+  // Vercel provides VERCEL_URL in production (without protocol)
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
+
+  // Vercel also provides VERCEL_PROJECT_PRODUCTION_URL for production deployments
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+
   // Local development
-  return process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3021";
+  return "http://localhost:3021";
 }
 
 interface ChainOptions {
@@ -25,7 +36,11 @@ export async function chainNext(
   body: object,
   _options?: ChainOptions
 ): Promise<void> {
-  const url = `${getBaseUrl()}${endpoint}`;
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}${endpoint}`;
+
+  console.log(`[CHAIN] Base URL: ${baseUrl}`);
+  console.log(`[CHAIN] Full URL: ${url}`);
 
   try {
     // Use a short timeout - we just want to ensure the request is sent
