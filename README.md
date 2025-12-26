@@ -4,9 +4,9 @@ A serverless web tracker that monitors wenxuecity forum posts and sends daily em
 
 ## Features
 
-- Tracks multiple keywords on wenxuecity.com forums
+- Tracks multiple keywords on wenxuecity.com forums and blogs
 - Fetches full post content (not just titles)
-- Filters to posts from last 7 days only
+- Filters to posts from last 3 days only
 - Deduplicates posts across runs
 - Sends aggregated email digests via Resend
 - Multi-phase job architecture with QStash for serverless compatibility
@@ -103,14 +103,16 @@ Generate secrets:
 openssl rand -hex 32
 ```
 
-### 6. Configure Keywords
+### 6. Configure Tracking Sources
 
 Edit `src/lib/config.ts`:
 
 ```typescript
-export const TRACKING_URLS = [
-  { name: "牛经沧海", url: "https://bbs.wenxuecity.com/archive/..." },
-  // Add more keywords (max 6 recommended)
+const PRODUCTION_URLS = [
+  // Forum archives
+  { name: "牛经沧海", url: "https://bbs.wenxuecity.com/bbs/archive.php?..." },
+  // Blog pages (add type: "blog")
+  { name: "亮线留痕", url: "https://blog.wenxuecity.com/myblog/82458/all.html", type: "blog" },
 ];
 ```
 
@@ -118,19 +120,26 @@ export const TRACKING_URLS = [
 
 ```bash
 npm install
-npm run dev   # Runs on port 3021
+cp .env.example .env  # Add your CRON_SECRET
+npm run dev           # Runs on port 3021
 ```
+
+Local dev uses a shorter `DEV_URLS` config (2 sources) for faster testing. The full `PRODUCTION_URLS` (10 sources) runs in production.
 
 Test endpoints:
 ```bash
-curl http://localhost:3021/api/cron
+# Trigger job (requires auth)
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" \
+  "http://localhost:3021/api/cron?force=true"
+
+# Check results (no auth)
 curl http://localhost:3021/api/preview
 curl http://localhost:3021/api/job/status
 curl http://localhost:3021/api/reset
 curl "http://localhost:3021/api/reset?full=true"  # Full reset including seen posts
 ```
 
-Local dev uses an in-memory KV mock and direct fetch for chaining, so no Upstash credentials needed locally.
+Local dev uses Upstash for state, so you need Redis credentials in `.env`.
 
 ## Production Usage
 
@@ -175,7 +184,7 @@ export const JOB_CONFIG = {
   archiveBatchSize: 3,    // Archive URLs per batch
   subpageBatchSize: 5,    // Subpages per batch
   rateLimitMs: 3000,      // Delay between requests (3s)
-  maxAgeDays: 7,          // Only include recent posts
+  maxAgeDays: 3,          // Only include recent posts
   minBytesForContent: 1,  // Minimum bytes to fetch content (0 = skip empty)
 };
 
