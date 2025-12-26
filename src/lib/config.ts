@@ -25,6 +25,23 @@ export const TRACKING_URLS = [
     name: "ybdddnlyglny",
     url: "https://bbs.wenxuecity.com/bbs/archive.php?keyword=ybdddnlyglny&username=on&submit1=%E6%9F%A5%E8%AF%A2&act=index&SubID=cfzh&year=current",
   },
+  {
+    name: "richard_hz",
+    url: "https://bbs.wenxuecity.com/bbs/archive.php?SubID=finance&keyword=richard_hz&username=on",
+  },
+  {
+    name: "西糖胡同",
+    url: "https://bbs.wenxuecity.com/bbs/archive.php?SubID=cfzh&keyword=%E8%A5%BF%E7%B3%96%E8%83%A1%E5%90%8C&username=on",
+  },
+  {
+    name: "我是一只井底蛙",
+    url: "https://bbs.wenxuecity.com/bbs/archive.php?SubID=cfzh&pos=bbs&keyword=%E6%88%91%E6%98%AF%E4%B8%80%E5%8F%AA%E4%BA%95%E5%BA%95%E8%9B%99&username=on",
+  },
+  {
+    name: "亮线留痕",
+    url: "https://blog.wenxuecity.com/myblog/82458/all.html",
+    type: "blog",
+  },
 ];
 
 // Rate limiting - delay between requests in milliseconds

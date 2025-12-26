@@ -9,7 +9,7 @@ import {
   updateJob,
   transitionJob,
 } from "@/lib/job";
-import { scrapeArchivePage, deduplicatePosts, ForumPost } from "@/lib/scraper";
+import { scrapeArchivePage, scrapeBlogPage, isBlogUrl, deduplicatePosts, ForumPost } from "@/lib/scraper";
 import { getSeenPostIds } from "@/lib/storage";
 import { sleep, JOB_CONFIG } from "@/lib/config";
 import { JobPost } from "@/types/job";
@@ -89,8 +89,10 @@ export async function POST(request: Request) {
       }
 
       try {
-        console.log(`[ARCHIVE] Scraping: ${name}`);
-        const posts = await scrapeArchivePage(url);
+        console.log(`[ARCHIVE] Scraping: ${name} (${isBlogUrl(url) ? "blog" : "forum"})`);
+        const posts = isBlogUrl(url)
+          ? await scrapeBlogPage(url)
+          : await scrapeArchivePage(url);
         const uniquePosts = deduplicatePosts(posts);
 
         // Filter to recent posts only (last N days)

@@ -109,6 +109,105 @@ export function deduplicatePosts(posts: ForumPost[]): ForumPost[] {
 }
 
 /**
+ * Check if a URL is a blog URL (vs forum archive)
+ */
+export function isBlogUrl(url: string): boolean {
+  return url.includes("blog.wenxuecity.com/myblog/");
+}
+
+/**
+ * Scrape a wenxuecity blog page for posts.
+ * Blog URLs look like: https://blog.wenxuecity.com/myblog/82458/202512/
+ */
+export async function scrapeBlogPage(url: string): Promise<ForumPost[]> {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; WebpageTracker/1.0; +https://github.com)",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  }
+
+  const html = await response.text();
+  const $ = cheerio.load(html);
+  const posts: ForumPost[] = [];
+
+  // Extract blog ID from URL for constructing full URLs
+  const blogIdMatch = url.match(/\/myblog\/(\d+)\//);
+  const blogId = blogIdMatch ? blogIdMatch[1] : "";
+
+  // Each blog post is in a div.articleCell
+  $(".articleCell").each((_, cell) => {
+    const $cell = $(cell);
+
+    // Get the title link
+    const $titleLink = $cell.find(".atc_title a");
+    const href = $titleLink.attr("href") || "";
+    const title = $titleLink.text().trim();
+
+    if (!href || !title) return;
+
+    // Extract post ID from href (e.g., /myblog/82458/202512/21135.html -> blog_82458_21135)
+    const postIdMatch = href.match(/\/myblog\/(\d+)\/(\d+)\/(\d+)\.html/);
+    if (!postIdMatch) return;
+
+    const id = `blog_${postIdMatch[1]}_${postIdMatch[3]}`;
+
+    // Build full URL
+    const fullUrl = href.startsWith("http")
+      ? href
+      : `https://blog.wenxuecity.com${href}`;
+
+    // Get date from .atc_tm (format: 2025-12-25 16:34:21)
+    const dateText = $cell.find(".atc_tm").text().trim();
+    const date = dateText.split(" ")[0] || ""; // Just the date part
+
+    posts.push({
+      id,
+      title,
+      url: fullUrl,
+      author: "", // Blog author is the blog owner, could extract from page
+      date,
+      bytes: 1000, // Blogs don't show bytes, assume content exists
+      forum: "博客",
+    });
+  });
+
+  return posts;
+}
+
+/**
+ * Scrape content from a blog post page.
+ */
+export async function scrapeBlogContent(url: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; WebpageTracker/1.0; +https://github.com)",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  }
+
+  const html = await response.text();
+  const $ = cheerio.load(html);
+
+  // Blog content is in .articalContent (note: typo in their HTML)
+  const $content = $(".articalContent");
+
+  if ($content.length > 0) {
+    return $content.text().trim().replace(/\s+/g, " ");
+  }
+
+  return "";
+}
+
+/**
  * Scrape the full content from a forum post page.
  * Returns the post body text content.
  */
@@ -135,8 +234,9 @@ export async function scrapeSubpageContent(url: string): Promise<string> {
     return $content.text().trim().replace(/\s+/g, " ");
   }
 
-  // Fallback for other page structures
+  // Fallback for other page structures (including blog pages)
   const fallbackSelectors = [
+    ".articalContent", // wenxuecity blog (note: typo in their HTML)
     "#articleBody",
     "#postbody",
     ".post-content",
