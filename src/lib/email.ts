@@ -154,14 +154,20 @@ export async function sendDigestWithContent(
     if (posts.length === 0) continue;
     totalPosts += posts.length;
 
+    // Sort by scrapeOrder - Redis hash doesn't preserve insertion order
+    const sortedPosts = [...posts].sort((a, b) => {
+      return (a.scrapeOrder ?? 999) - (b.scrapeOrder ?? 999);
+    });
+
     htmlContent += `<h3 style="margin-top: 24px; color: #333;">${keyword} (${posts.length} new)</h3>`;
 
-    for (const post of posts) {
+    for (const post of sortedPosts) {
+      // Only show content section if there's actual content
       const contentHtml = post.content
         ? `<div style="background: #f9f9f9; padding: 12px; margin: 8px 0; border-left: 3px solid #ddd; white-space: pre-wrap;">${escapeHtml(post.content.substring(0, 2000))}${post.content.length > 2000 ? "..." : ""}</div>`
         : post.fetchError
           ? `<p style="color: #999; font-style: italic;">Failed to fetch: ${escapeHtml(post.fetchError)}</p>`
-          : `<p style="color: #999; font-style: italic;">(No content)</p>`;
+          : ""; // No content = don't show anything
 
       htmlContent += `
         <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #eee;">

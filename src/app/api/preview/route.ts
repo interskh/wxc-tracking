@@ -15,7 +15,12 @@ function buildEmailHtml(
     if (posts.length === 0) continue;
     totalPosts += posts.length;
 
-    const postList = posts
+    // Sort by scrapeOrder - Redis hash doesn't preserve insertion order
+    const sortedPosts = [...posts].sort((a, b) => {
+      return (a.scrapeOrder ?? 999) - (b.scrapeOrder ?? 999);
+    });
+
+    const postList = sortedPosts
       .map((post) => {
         // Format content preview (first 500 chars, preserve some formatting)
         let contentHtml = "";

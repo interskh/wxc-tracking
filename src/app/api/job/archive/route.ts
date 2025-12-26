@@ -76,6 +76,7 @@ export async function POST(request: Request) {
 
     // Get previously seen post IDs
     const seenIds = await getSeenPostIds();
+    console.log(`[ARCHIVE] Loaded ${seenIds.size} seen post IDs`);
     const allNewPosts: JobPost[] = [];
     const subpagePostIds: string[] = [];
 
@@ -97,11 +98,15 @@ export async function POST(request: Request) {
 
         // Filter to recent posts only (last N days)
         const recentPosts = filterRecentPosts(uniquePosts, JOB_CONFIG.maxAgeDays);
-        console.log(`[ARCHIVE] Found ${recentPosts.length} recent posts for ${name}`);
 
-        // Filter to new posts only
+        // Filter to new posts only, preserving scrape order
+        let skippedSeen = 0;
+        let orderIndex = 0;
         for (const post of recentPosts) {
-          if (seenIds.has(post.id)) continue;
+          if (seenIds.has(post.id)) {
+            skippedSeen++;
+            continue;
+          }
 
           const jobPost: JobPost = {
             id: post.id,
@@ -113,6 +118,7 @@ export async function POST(request: Request) {
             keyword: name,
             forum: post.forum,
             status: "pending",
+            scrapeOrder: orderIndex++, // Preserve original order (0 = most recent)
           };
 
           allNewPosts.push(jobPost);
@@ -125,6 +131,7 @@ export async function POST(request: Request) {
             jobPost.status = "skipped";
           }
         }
+        console.log(`[ARCHIVE] ${name}: ${recentPosts.length} recent, ${skippedSeen} already seen, ${recentPosts.length - skippedSeen} new`);
       } catch (error) {
         console.error(`Error scraping ${name}:`, error);
         // Continue with other URLs in batch

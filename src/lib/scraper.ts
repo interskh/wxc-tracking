@@ -162,8 +162,8 @@ export async function scrapeBlogPage(url: string): Promise<ForumPost[]> {
       : `https://blog.wenxuecity.com${href}`;
 
     // Get date from .atc_tm (format: 2025-12-25 16:34:21)
-    const dateText = $cell.find(".atc_tm").text().trim();
-    const date = dateText.split(" ")[0] || ""; // Just the date part
+    // Keep full datetime for proper sorting
+    const date = $cell.find(".atc_tm").text().trim();
 
     posts.push({
       id,

@@ -1,6 +1,7 @@
 // Tracking configuration
 
-export const TRACKING_URLS = [
+// Full list for production
+const PRODUCTION_URLS = [
   {
     name: "牛经沧海",
     url: "https://bbs.wenxuecity.com/bbs/archive.php?SubID=cfzh&keyword=%E7%89%9B%E7%BB%8F%E6%B2%A7%E6%B5%B7&username=on",
@@ -44,6 +45,23 @@ export const TRACKING_URLS = [
   },
 ];
 
+// Shorter list for local development
+const DEV_URLS = [
+  {
+    name: "牛经沧海",
+    url: "https://bbs.wenxuecity.com/bbs/archive.php?SubID=cfzh&keyword=%E7%89%9B%E7%BB%8F%E6%B2%A7%E6%B5%B7&username=on",
+  },
+  {
+    name: "亮线留痕",
+    url: "https://blog.wenxuecity.com/myblog/82458/all.html",
+    type: "blog",
+  },
+];
+
+// Use dev config locally, full config in production
+const isLocalDev = process.env.NODE_ENV === "development";
+export const TRACKING_URLS = isLocalDev ? DEV_URLS : PRODUCTION_URLS;
+
 // Rate limiting - delay between requests in milliseconds
 export const RATE_LIMIT_MS = 3000;
 
@@ -61,7 +79,7 @@ export const JOB_CONFIG = {
   minBytesForContent: 1, // Fetch content if bytes >= this (0 = skip empty posts)
 
   // Date filtering
-  maxAgeDays: 7, // Only include posts from the last N days
+  maxAgeDays: 3, // Only include posts from the last N days
 };
 
 // Email configuration

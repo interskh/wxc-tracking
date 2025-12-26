@@ -39,6 +39,7 @@ export interface JobPost {
   status: "pending" | "fetched" | "skipped";
   content?: string; // Full content after subpage fetch
   fetchError?: string;
+  scrapeOrder?: number; // Preserve original scrape order (0 = most recent)
 }
 
 export interface ArchiveBatchRequest {
