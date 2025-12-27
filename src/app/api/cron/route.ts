@@ -31,23 +31,30 @@ export async function GET(request: Request) {
     console.log("[CRON] Existing job:", existingJob?.id || "none", "force:", forceNew);
 
     if (existingJob) {
-      // Check if it's stuck
-      const { isStuck } = await checkStuckJob();
+      // Only block on active jobs (not complete/failed)
+      const activeStatuses = ["discovering", "fetching", "finalizing"];
+      const isActive = activeStatuses.includes(existingJob.status);
 
-      if (isStuck) {
-        // Mark stuck job as failed and create new one
-        await transitionJob(existingJob.id, "failed", {
-          error: "Job timed out - marked as stuck",
-        });
-      } else {
-        // Job is still running, don't create a new one
-        return NextResponse.json({
-          success: true,
-          message: "Job already in progress",
-          jobId: existingJob.id,
-          status: existingJob.status,
-        });
+      if (isActive) {
+        // Check if it's stuck
+        const { isStuck } = await checkStuckJob();
+
+        if (isStuck) {
+          // Mark stuck job as failed and create new one
+          await transitionJob(existingJob.id, "failed", {
+            error: "Job timed out - marked as stuck",
+          });
+        } else {
+          // Job is still running, don't create a new one
+          return NextResponse.json({
+            success: true,
+            message: "Job already in progress",
+            jobId: existingJob.id,
+            status: existingJob.status,
+          });
+        }
       }
+      // If job is complete/failed, allow creating a new one
     }
 
     // Create new job
