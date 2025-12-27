@@ -76,7 +76,8 @@ export async function POST(request: Request) {
 
     // Get previously seen post IDs
     const seenIds = await getSeenPostIds();
-    console.log(`[ARCHIVE] Loaded ${seenIds.size} seen post IDs`);
+    const seenSample = Array.from(seenIds).slice(0, 5);
+    console.log(`[ARCHIVE] Loaded ${seenIds.size} seen post IDs, sample: ${seenSample.join(', ')}`);
     const allNewPosts: JobPost[] = [];
     const subpagePostIds: string[] = [];
 
@@ -102,6 +103,9 @@ export async function POST(request: Request) {
         // Filter to new posts only, preserving scrape order
         let skippedSeen = 0;
         let orderIndex = 0;
+        const firstFewIds = recentPosts.slice(0, 3).map(p => p.id);
+        console.log(`[ARCHIVE] ${name}: First few post IDs: ${firstFewIds.join(', ')}`);
+
         for (const post of recentPosts) {
           if (seenIds.has(post.id)) {
             skippedSeen++;

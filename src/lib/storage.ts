@@ -12,9 +12,14 @@ export interface CheckResult {
 export async function getSeenPostIds(): Promise<Set<string>> {
   try {
     const ids = await kv.smembers(SEEN_POSTS_KEY);
+    console.log(`[STORAGE] smembers returned ${Array.isArray(ids) ? ids.length : 'non-array'} IDs`);
+    if (!ids || !Array.isArray(ids)) {
+      console.error("[STORAGE] smembers returned invalid data:", typeof ids);
+      return new Set();
+    }
     return new Set(ids as string[]);
-  } catch {
-    // KV not configured yet, return empty set
+  } catch (error) {
+    console.error("[STORAGE] Failed to get seen posts:", error);
     return new Set();
   }
 }
@@ -23,13 +28,15 @@ export async function getSeenPostIds(): Promise<Set<string>> {
 export async function markPostsAsSeen(postIds: string[]): Promise<void> {
   if (postIds.length === 0) return;
 
+  console.log(`[STORAGE] Marking ${postIds.length} posts as seen`);
+  console.log(`[STORAGE] Sample IDs: ${postIds.slice(0, 5).join(', ')}`);
+
   try {
-    // Add each ID to the set (sadd accepts variable args via apply)
-    for (const id of postIds) {
-      await kv.sadd(SEEN_POSTS_KEY, id);
-    }
+    // Add all IDs at once (more efficient)
+    const added = await kv.sadd(SEEN_POSTS_KEY, ...postIds);
+    console.log(`[STORAGE] Actually added ${added} new IDs to seen set`);
   } catch (error) {
-    console.error("Failed to mark posts as seen:", error);
+    console.error("[STORAGE] Failed to mark posts as seen:", error);
   }
 }
 
